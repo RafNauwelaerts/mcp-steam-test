@@ -21,6 +21,8 @@ A Spring Boot MCP (Model Context Protocol) server that exposes Steam game and li
    steam.api.key=YOUR_STEAM_API_KEY
    steam.default.user.id=YOUR_STEAM_ID
    ```
+  you can get an api key on https://steamcommunity.com/dev/apikey
+
 4. Run the application:
    ```
    ./mvnw spring-boot:run

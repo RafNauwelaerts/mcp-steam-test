@@ -59,7 +59,9 @@ Then start Claude Code (`claude`) and ask anything — for example:
 
 | Tool                  | Description                          |
 |-----------------------|--------------------------------------|
-| `getMostPlayedGame`   | Your most played game by total hours |
-| `getHoursPlayed`      | Hours played for a specific game     |
-| `getGameAchievements` | Unlocked achievements for a game     |
-| `getAllGames`         | Full list of owned games             |
+| `getMostPlayedGame`      | Your most played game by total hours              |
+| `getHoursPlayed`         | Hours played for a specific game                  |
+| `getGameAchievements`    | Unlocked achievements for a game                  |
+| `getAllGames`            | Full list of owned games, sorted alphabetically   |
+| `getTopGamesByHoursPlayed` | Top N games ranked by hours played             |
+| `getTotalPlaytime`       | Combined playtime across your entire library      |

@@ -88,7 +88,7 @@ public class SteamApiClient {
     public Optional<List<SteamDtos.OwnedGame>> getOwnedGames(String steamId) {
         try {
             SteamDtos.OwnedGamesResponse response = apiClient.get()
-                    .uri("/IPlayerService/GetOwnedGames/v1/?key={key}&steamid={steamId}&include_appinfo=true",
+                    .uri("/IPlayerService/GetOwnedGames/v1/?key={key}&steamid={steamId}&include_appinfo=true&include_played_free_games=true",
                             apiKey, steamId)
                     .retrieve()
                     .body(SteamDtos.OwnedGamesResponse.class);

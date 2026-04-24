@@ -4,7 +4,9 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -97,7 +99,7 @@ public class GameInfoService {
                 .flatMap(games -> games.stream()
                         .filter(g -> g.name() != null && g.name().equalsIgnoreCase(gameName))
                         .findFirst())
-                .map(g -> gameName + ": " + (g.playtimeForever() / 60) + " hours played")
+                .map(g -> gameName + ": " + (g.playtimeForever() / 60) + " hours and " + (g.playtimeForever() % 60) + " minutes played")
                 .orElse("Game not found in library: " + gameName);
     }
 
@@ -123,8 +125,22 @@ public class GameInfoService {
                 .map(games -> games.stream()
                         .filter(g -> g.name() != null)
                         .map(SteamDtos.OwnedGame::name)
-                        .sorted()
+                        .sorted(Comparator.comparing(GameInfoService::sortKey))
                         .collect(Collectors.joining("\n")))
+                .orElse("Could not retrieve game library");
+    }
+
+    private static String sortKey(String name) {
+        return name.replaceFirst("(?i)^(the|a|an)\\s+", "");
+    }
+
+    @Tool(description = "Returns the total playtime across all games in the user's Steam library")
+    public String getTotalPlaytime() {
+        return steamApiClient.getOwnedGames(defaultSteamId)
+                .map(games -> {
+                    int total = games.stream().mapToInt(SteamDtos.OwnedGame::playtimeForever).sum();
+                    return String.format("Total playtime: %d hours and %d minutes", total / 60, total % 60);
+                })
                 .orElse("Could not retrieve game library");
     }
 
@@ -132,6 +148,24 @@ public class GameInfoService {
     public String getMostPlayedGame() {
         return steamApiClient.getMostPlayedGame(defaultSteamId)
                 .map(g -> g.name() + " with " + (g.playtimeForever() / 60) + " hours played")
+                .orElse("Could not retrieve game library");
+    }
+
+    @Tool(description = "Returns the top X most played games from the user's Steam library, sorted by hours played descending. Includes free-to-play games.")
+    public String getTopGamesByHoursPlayed(int count) {
+        AtomicInteger rank = new AtomicInteger(1);
+        return steamApiClient.getOwnedGames(defaultSteamId)
+                .map(games -> games.stream()
+                        .filter(g -> g.name() != null && g.playtimeForever() > 0)
+                        .sorted(Comparator.comparingInt(SteamDtos.OwnedGame::playtimeForever).reversed())
+                        .limit(count)
+                        .map(g -> String.format("%d. %s — %dh %dm",
+                                rank.getAndIncrement(),
+                                g.name(),
+                                g.playtimeForever() / 60,
+                                g.playtimeForever() % 60))
+                        .collect(Collectors.joining("\n")))
+                .filter(result -> !result.isBlank())
                 .orElse("Could not retrieve game library");
     }
 

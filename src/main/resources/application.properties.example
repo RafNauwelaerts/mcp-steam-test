@@ -1,3 +1,4 @@
 spring.application.name=test
 steam.api.key=YOUR_STEAM_API_KEY
 steam.default.user.id=YOUR_STEAM_ID
+anthropic.api.key=YOUR_ANTHROPIC_API_KEY

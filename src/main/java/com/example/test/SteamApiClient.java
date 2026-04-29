@@ -137,7 +137,8 @@ public class SteamApiClient {
     record AppDetailEntry(boolean success, AppData data) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record AppData(
+    public record AppData(
+            String name,
             List<String> developers,
             @JsonProperty("short_description") String shortDescription,
             @JsonProperty("release_date") ReleaseDate releaseDate,
@@ -175,5 +176,5 @@ public class SteamApiClient {
     record AppNews(List<NewsItem> newsitems) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record NewsItem(String title, String url, String contents) {}
+    public record NewsItem(String title, String url, String contents) {}
 }

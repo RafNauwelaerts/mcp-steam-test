@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -13,11 +15,14 @@ import java.util.stream.Collectors;
 public class GameInfoService {
 
     private final SteamApiClient steamApiClient;
+    private final AnthropicClient anthropicClient;
     private final String defaultSteamId;
 
     public GameInfoService(SteamApiClient steamApiClient,
+                           AnthropicClient anthropicClient,
                            @Value("${steam.default.user.id}") String defaultSteamId) {
         this.steamApiClient = steamApiClient;
+        this.anthropicClient = anthropicClient;
         this.defaultSteamId = defaultSteamId;
     }
 
@@ -78,7 +83,7 @@ public class GameInfoService {
     public String getCurrentPlayerCount(String gameName) {
         return steamApiClient.searchAppId(gameName)
                 .flatMap(steamApiClient::getCurrentPlayerCount)
-                .map(count -> String.format("%,d players currently online in %s", count, gameName))
+                .map(count -> String.format(Locale.US, "%,d players currently online in %s", count, gameName))
                 .orElse("Player count not available for: " + gameName);
     }
 
@@ -113,8 +118,13 @@ public class GameInfoService {
                             .filter(a -> a.achieved() == 1)
                             .map(SteamDtos.Achievement::name)
                             .collect(Collectors.joining(", "));
+                    String lockedNames = achievements.stream()
+                            .filter(a -> a.achieved() == 0)
+                            .map(SteamDtos.Achievement::name)
+                            .collect(Collectors.joining(", "));
                     return unlocked + "/" + achievements.size() + " achievements unlocked"
-                            + (unlockedNames.isEmpty() ? "" : "\nUnlocked: " + unlockedNames);
+                            + (unlockedNames.isEmpty() ? "" : "\nUnlocked: " + unlockedNames)
+                            + (lockedNames.isEmpty() ? "" : "\nlocked: " + lockedNames);
                 })
                 .orElse("Could not retrieve achievements for: " + gameName);
     }
@@ -123,8 +133,8 @@ public class GameInfoService {
     public String getAllGames() {
         return steamApiClient.getOwnedGames(defaultSteamId)
                 .map(games -> games.stream()
-                        .filter(g -> g.name() != null)
                         .map(SteamDtos.OwnedGame::name)
+                        .filter(Objects::nonNull)
                         .sorted(Comparator.comparing(GameInfoService::sortKey))
                         .collect(Collectors.joining("\n")))
                 .orElse("Could not retrieve game library");
@@ -147,7 +157,7 @@ public class GameInfoService {
     @Tool(description = "Returns the most played Steam game of the configured user")
     public String getMostPlayedGame() {
         return steamApiClient.getMostPlayedGame(defaultSteamId)
-                .map(g -> g.name() + " with " + (g.playtimeForever() / 60) + " hours played")
+                .map(g -> g.name() + " with " + (g.playtimeForever() / 60) + " hours and " + (g.playtimeForever() %60 + " minutes played"))
                 .orElse("Could not retrieve game library");
     }
 
@@ -155,16 +165,22 @@ public class GameInfoService {
     public String getTopGamesByHoursPlayed(int count) {
         AtomicInteger rank = new AtomicInteger(1);
         return steamApiClient.getOwnedGames(defaultSteamId)
-                .map(games -> games.stream()
-                        .filter(g -> g.name() != null && g.playtimeForever() > 0)
-                        .sorted(Comparator.comparingInt(SteamDtos.OwnedGame::playtimeForever).reversed())
-                        .limit(count)
-                        .map(g -> String.format("%d. %s — %dh %dm",
-                                rank.getAndIncrement(),
-                                g.name(),
-                                g.playtimeForever() / 60,
-                                g.playtimeForever() % 60))
-                        .collect(Collectors.joining("\n")))
+                .map(games -> {
+                    if (games.isEmpty()) {
+                        return "No played games in library";
+                    }else {
+                        return  games.stream()
+                                .filter(g -> g.name() != null)
+                                .sorted(Comparator.comparingInt(SteamDtos.OwnedGame::playtimeForever).reversed())
+                                .limit(count)
+                                .map(g -> String.format("%d. %s — %dh %dm",
+                                        rank.getAndIncrement(),
+                                        g.name(),
+                                        g.playtimeForever() / 60,
+                                        g.playtimeForever() % 60))
+                                .collect(Collectors.joining("\n"));
+                    }
+                })
                 .filter(result -> !result.isBlank())
                 .orElse("Could not retrieve game library");
     }

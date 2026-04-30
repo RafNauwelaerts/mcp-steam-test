@@ -4,10 +4,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -208,4 +205,61 @@ public class GameInfoService {
                 })
                 .orElse("Game not found: " + gameName);
     }
+
+    @Tool(description = "Give recommendations that are on sale based on user input")
+    public String getSaleRecommendations(String user_requests){
+        String prompt= "List 50 popular Steam games that match this request: \""
+        + user_requests +"\". Reply with only the game names, one per line, no numbering, no extra text.";
+
+        String claudeResponse = anthropicClient.complete(prompt);
+
+        List<String> possibleRecommendations = claudeResponse.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .toList();
+        if (possibleRecommendations.isEmpty()) {
+            return "could not find any recommendations from claude";
+        }
+
+        String onSaleGames = possibleRecommendations.stream()
+                .map(name -> Map.entry(name, fetchDetails(name)))
+                .filter(game -> game.getValue().isPresent())
+                .filter(game -> game.getValue().get().priceOverview() != null
+                        && game.getValue().get().priceOverview().discountPercent() > 0)
+                .map(recommendation -> {
+                    var price = recommendation.getValue().get().priceOverview();
+                    return "• " + recommendation.getKey() + " - " + price.finalFormatted() + "(" + price.discountPercent() + "% off)";
+                }).collect(Collectors.joining("\n"));
+        return onSaleGames.isBlank()
+                ? "No games matching your request are currently on sale on steam"
+                : onSaleGames;
+    }
+
+    @Tool(description = "Give any recommendations that based on user input")
+    public String getRecommendations(String user_requests){
+        String prompt= "List 15 popular Steam games that match this request: \""
+                + user_requests +"\". Reply with only the game names, one per line, no numbering, no extra text.";
+
+        String claudeResponse = anthropicClient.complete(prompt);
+
+        List<String> possibleRecommendations = claudeResponse.lines()
+                .map(String::trim)
+                .filter(line -> !line.isBlank())
+                .toList();
+        if (possibleRecommendations.isEmpty()) {
+            return "could not find any recommendations from claude";
+        }
+
+        String onSaleGames = possibleRecommendations.stream()
+                .map(name -> Map.entry(name, fetchDetails(name)))
+                .filter(game -> game.getValue().isPresent())
+                .map(recommendation -> {
+                    var price = recommendation.getValue().get().priceOverview();
+                    return "• " + recommendation.getKey() + " - " + price.finalFormatted() + "(" + price.discountPercent() + "% off)";
+                }).collect(Collectors.joining("\n"));
+        return onSaleGames.isBlank()
+                ? "No games matching your request are currently on sale on steam"
+                : onSaleGames;
+    }
+
 }

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -504,5 +505,164 @@ public class GameInfoServiceTest {
 
         String result = service.getGameInfo("Fake game");
         assertThat(result).contains("Game not found");
+    }
+
+    //successfully show recommended on sale games
+    @Test
+    void getSaleRecommendations_returnsOnSaleGames() {
+        SteamApiClient.AppData hollowKnightData = new SteamApiClient.AppData(
+                "Hollow Knight",
+                List.of("Team Cherry"),
+                "A challenging 2D action-adventure.",
+                new SteamApiClient.ReleaseDate(false, "February 24, 2017"),
+                new SteamApiClient.PriceOverview("€7.49", 50),
+                List.of(new SteamApiClient.Genre("1", "Action"))
+        );
+        SteamApiClient.AppData hadesData = new SteamApiClient.AppData(
+                "Hades",
+                List.of("Supergiant Games"),
+                "A rogue-like dungeon crawler.",
+                new SteamApiClient.ReleaseDate(false, "September 17, 2020"),
+                new SteamApiClient.PriceOverview("€12.49", 30),
+                List.of(new SteamApiClient.Genre("1", "Action"))
+        );
+        SteamApiClient.AppData celesteData = new SteamApiClient.AppData(
+                "Celeste",
+                List.of("Maddy Makes Games"),
+                "A precise platformer about climbing a mountain.",
+                new SteamApiClient.ReleaseDate(false, "January 25, 2018"),
+                new SteamApiClient.PriceOverview("€19.99", 0),
+                List.of(new SteamApiClient.Genre("1", "Platformer"))
+        );
+
+        when(anthropicClient.complete(anyString())).thenReturn("Hollow Knight\nHades\nCeleste");
+        when(steamApiClient.searchAppId("Hollow Knight")).thenReturn(Optional.of(367520));
+        when(steamApiClient.getAppDetails(367520)).thenReturn(Optional.of(hollowKnightData));
+        when(steamApiClient.searchAppId("Hades")).thenReturn(Optional.of(1145360));
+        when(steamApiClient.getAppDetails(1145360)).thenReturn(Optional.of(hadesData));
+        when(steamApiClient.searchAppId("Celeste")).thenReturn(Optional.of(504230));
+        when(steamApiClient.getAppDetails(504230)).thenReturn(Optional.of(celesteData));
+
+        String result = service.getSaleRecommendations("fun indie games");
+
+        assertThat(result).contains("Hollow Knight");
+        assertThat(result).contains("€7.49");
+        assertThat(result).contains("50% off");
+        assertThat(result).contains("Hades");
+        assertThat(result).contains("€12.49");
+        assertThat(result).contains("30% off");
+        assertThat(result).doesNotContain("Celeste");
+    }
+
+    //no games matching the request are on sale
+    @Test
+    void getSaleRecommendations_noGamesOnSale_returnsNoSalesMessage() {
+        SteamApiClient.AppData celesteData = new SteamApiClient.AppData(
+                "Celeste",
+                List.of("Maddy Makes Games"),
+                "A precise platformer about climbing a mountain.",
+                new SteamApiClient.ReleaseDate(false, "January 25, 2018"),
+                new SteamApiClient.PriceOverview("€19.99", 0),
+                List.of(new SteamApiClient.Genre("1", "Platformer"))
+        );
+
+        when(anthropicClient.complete(anyString())).thenReturn("Celeste");
+        when(steamApiClient.searchAppId("Celeste")).thenReturn(Optional.of(504230));
+        when(steamApiClient.getAppDetails(504230)).thenReturn(Optional.of(celesteData));
+
+        String result = service.getSaleRecommendations("fun platformers");
+
+        assertThat(result).contains("No games matching your request are currently on sale");
+    }
+
+    //claude returns empty response
+    @Test
+    void getSaleRecommendations_claudeReturnsEmpty_returnsErrorMessage() {
+        when(anthropicClient.complete(anyString())).thenReturn("");
+
+        String result = service.getSaleRecommendations("anything");
+
+        assertThat(result).contains("could not find any recommendations from claude");
+    }
+
+    //successfully show recommendations including games not on sale
+    @Test
+    void getRecommendations_returnsAllFoundGames() {
+        SteamApiClient.AppData hollowKnightData = new SteamApiClient.AppData(
+                "Hollow Knight",
+                List.of("Team Cherry"),
+                "A challenging 2D action-adventure.",
+                new SteamApiClient.ReleaseDate(false, "February 24, 2017"),
+                new SteamApiClient.PriceOverview("€7.49", 50),
+                List.of(new SteamApiClient.Genre("1", "Action"))
+        );
+        SteamApiClient.AppData celesteData = new SteamApiClient.AppData(
+                "Celeste",
+                List.of("Maddy Makes Games"),
+                "A precise platformer about climbing a mountain.",
+                new SteamApiClient.ReleaseDate(false, "January 25, 2018"),
+                new SteamApiClient.PriceOverview("€19.99", 0),
+                List.of(new SteamApiClient.Genre("1", "Platformer"))
+        );
+
+        when(anthropicClient.complete(anyString())).thenReturn("Hollow Knight\nCeleste");
+        when(steamApiClient.searchAppId("Hollow Knight")).thenReturn(Optional.of(367520));
+        when(steamApiClient.getAppDetails(367520)).thenReturn(Optional.of(hollowKnightData));
+        when(steamApiClient.searchAppId("Celeste")).thenReturn(Optional.of(504230));
+        when(steamApiClient.getAppDetails(504230)).thenReturn(Optional.of(celesteData));
+
+        String result = service.getRecommendations("fun indie games");
+
+        assertThat(result).contains("Hollow Knight");
+        assertThat(result).contains("€7.49");
+        assertThat(result).contains("50% off");
+        assertThat(result).contains("Celeste");
+        assertThat(result).contains("€19.99");
+        assertThat(result).contains("0% off");
+    }
+
+    //games not found on steam are excluded from recommendations
+    @Test
+    void getRecommendations_gamesNotOnSteam_areExcluded() {
+        SteamApiClient.AppData hadesData = new SteamApiClient.AppData(
+                "Hades",
+                List.of("Supergiant Games"),
+                "A rogue-like dungeon crawler.",
+                new SteamApiClient.ReleaseDate(false, "September 17, 2020"),
+                new SteamApiClient.PriceOverview("€12.49", 30),
+                List.of(new SteamApiClient.Genre("1", "Action"))
+        );
+
+        when(anthropicClient.complete(anyString())).thenReturn("Hades\nFake game");
+        when(steamApiClient.searchAppId("Hades")).thenReturn(Optional.of(1145360));
+        when(steamApiClient.getAppDetails(1145360)).thenReturn(Optional.of(hadesData));
+        when(steamApiClient.searchAppId("Fake game")).thenReturn(Optional.empty());
+
+        String result = service.getRecommendations("action games");
+
+        assertThat(result).contains("Hades");
+        assertThat(result).doesNotContain("Fake game");
+    }
+
+    //all recommended games not found on steam returns no games message
+    @Test
+    void getRecommendations_noGamesFoundOnSteam_returnsNoGamesMessage() {
+        when(anthropicClient.complete(anyString())).thenReturn("Fake game 1\nFake game 2");
+        when(steamApiClient.searchAppId("Fake game 1")).thenReturn(Optional.empty());
+        when(steamApiClient.searchAppId("Fake game 2")).thenReturn(Optional.empty());
+
+        String result = service.getRecommendations("anything");
+
+        assertThat(result).contains("No games matching your request are currently on steam");
+    }
+
+    //claude returns empty response for getRecommendations
+    @Test
+    void getRecommendations_claudeReturnsEmpty_returnsErrorMessage() {
+        when(anthropicClient.complete(anyString())).thenReturn("");
+
+        String result = service.getRecommendations("anything");
+
+        assertThat(result).contains("could not find any recommendations from claude");
     }
 }

@@ -8,6 +8,7 @@ A Spring Boot MCP (Model Context Protocol) server that exposes Steam game and li
 - Maven
 - A [Steam Web API key](https://steamcommunity.com/dev/apikey) (free)
 - Your [Steam ID](https://www.steamidfinder.com/)
+- An [Anthropic API key](https://console.anthropic.com/) (required for recommendation tools)
 
 ## Setup
 
@@ -20,6 +21,7 @@ A Spring Boot MCP (Model Context Protocol) server that exposes Steam game and li
    ```properties
    steam.api.key=YOUR_STEAM_API_KEY
    steam.default.user.id=YOUR_STEAM_ID
+   anthropic.api.key=YOUR_ANTHROPIC_API_KEY
    ```
 
 4. Run the application:
@@ -65,3 +67,12 @@ Then start Claude Code (`claude`) and ask anything — for example:
 | `getAllGames`            | Full list of owned games, sorted alphabetically   |
 | `getTopGamesByHoursPlayed` | Top N games ranked by hours played             |
 | `getTotalPlaytime`       | Combined playtime across your entire library      |
+
+### Recommendations (requires Anthropic API key)
+
+| Tool                      | Description                                                                 |
+|---------------------------|-----------------------------------------------------------------------------|
+| `getRecommendations`      | Suggests games matching a description (e.g. "relaxing co-op games")        |
+| `getSaleRecommendations`  | Same as above, but filtered to only games currently on sale on Steam        |
+
+These tools use Claude to generate a list of candidate games, then verify each one against the Steam Store API to return real results with live pricing.
